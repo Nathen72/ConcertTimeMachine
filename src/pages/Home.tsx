@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { searchArtists } from '@/api/setlistfm'
 import { useConcertStore, type Artist } from '@/stores/useConcertStore'
+import { getArtistInfo } from '@/api/spotify'
 
 export function Home() {
   const [query, setQuery] = useState('')
@@ -137,9 +138,20 @@ export function Home() {
                   className="cursor-pointer transition-all duration-300"
                   onClick={() => handleSelectArtist(artist)}
                 >
+                  {artist.spotifyImage && (
+                    <div className="w-full h-48 overflow-hidden">
+                      <img
+                        src={artist.spotifyImage}
+                        alt={artist.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                   <CardHeader>
                     <CardTitle className="text-xl flex items-center gap-2">
-                      <Music className="w-5 h-5 text-vintage-orange" />
+                      {!artist.spotifyImage && (
+                        <Music className="w-5 h-5 text-vintage-orange" />
+                      )}
                       {artist.name}
                     </CardTitle>
                     {artist.disambiguation && (

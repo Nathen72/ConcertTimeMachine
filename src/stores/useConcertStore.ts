@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { SpotifyTrack } from '../api/spotify'
 
 export interface Artist {
   mbid: string
@@ -6,6 +7,7 @@ export interface Artist {
   sortName?: string
   disambiguation?: string
   url?: string
+  spotifyImage?: string
 }
 
 export interface Venue {
@@ -61,12 +63,16 @@ interface ConcertStore {
   selectedConcert: Concert | null
   currentSongIndex: number
   isPlaying: boolean
+  currentSpotifyTrack: SpotifyTrack | null
+  spotifyTracks: Map<string, SpotifyTrack>
 
   setSelectedArtist: (artist: Artist | null) => void
   setConcerts: (concerts: Concert[]) => void
   setSelectedConcert: (concert: Concert | null) => void
   setCurrentSongIndex: (index: number) => void
   setIsPlaying: (isPlaying: boolean) => void
+  setCurrentSpotifyTrack: (track: SpotifyTrack | null) => void
+  setSpotifyTracks: (tracks: Map<string, SpotifyTrack>) => void
   nextSong: () => void
   previousSong: () => void
   reset: () => void
@@ -78,12 +84,16 @@ export const useConcertStore = create<ConcertStore>((set, get) => ({
   selectedConcert: null,
   currentSongIndex: 0,
   isPlaying: false,
+  currentSpotifyTrack: null,
+  spotifyTracks: new Map(),
 
   setSelectedArtist: (artist) => set({ selectedArtist: artist }),
   setConcerts: (concerts) => set({ concerts }),
   setSelectedConcert: (concert) => set({ selectedConcert: concert, currentSongIndex: 0 }),
   setCurrentSongIndex: (index) => set({ currentSongIndex: index }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
+  setCurrentSpotifyTrack: (track) => set({ currentSpotifyTrack: track }),
+  setSpotifyTracks: (tracks) => set({ spotifyTracks: tracks }),
 
   nextSong: () => {
     const { selectedConcert, currentSongIndex } = get()
@@ -108,5 +118,7 @@ export const useConcertStore = create<ConcertStore>((set, get) => ({
     selectedConcert: null,
     currentSongIndex: 0,
     isPlaying: false,
+    currentSpotifyTrack: null,
+    spotifyTracks: new Map(),
   }),
 }))
