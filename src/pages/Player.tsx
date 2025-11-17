@@ -219,7 +219,7 @@ export function Player() {
                       {currentSong?.name || 'Select a song'}
                     </h2>
                     {currentSong?.cover && (
-                      <p className="text-lg text-vintage-orange font-medium">
+                      <p className="text-lg text-vintage-teal/90 font-medium">
                         Originally by {currentSong.cover.name}
                       </p>
                     )}
@@ -229,7 +229,7 @@ export function Player() {
                         <p className="text-sm">{currentSong.info}</p>
                       </div>
                     )}
-                    <p className="text-vintage-teal/60">
+                    <p className="text-vintage-teal/75 font-medium">
                       {currentSong?.setName}
                       {currentSong?.encore && ` • Encore ${currentSong.encore}`}
                     </p>
@@ -273,7 +273,7 @@ export function Player() {
                 </div>
 
                 {/* Progress */}
-                <div className="text-center text-sm text-vintage-teal/60">
+                <div className="text-center text-sm text-vintage-teal/75 font-medium">
                   Track {currentSongIndex + 1} of {allSongs.length}
                 </div>
               </CardContent>
@@ -294,7 +294,7 @@ export function Player() {
                 <div className="space-y-6">
                   {selectedConcert.sets?.set?.map((set, setIndex) => (
                     <div key={setIndex} className="space-y-2">
-                      <h3 className="font-display font-semibold text-vintage-orange sticky top-0 bg-white/80 backdrop-blur-sm py-2 -mx-6 px-6">
+                      <h3 className="font-display font-semibold text-vintage-teal sticky top-0 bg-white/80 backdrop-blur-sm py-2 -mx-6 px-6">
                         {set.name || `Set ${setIndex + 1}`}
                         {set.encore && ` (Encore ${set.encore})`}
                       </h3>
@@ -309,10 +309,10 @@ export function Player() {
                             <motion.button
                               key={songIndex}
                               onClick={() => setCurrentSongIndex(globalIndex)}
-                              className={`w-full text-left px-4 py-2 rounded-md transition-all ${
+                              className={`w-full text-left px-4 py-2 rounded-md transition-all duration-200 ${
                                 isCurrentSong
                                   ? 'bg-vintage-orange text-vintage-cream font-semibold shadow-md'
-                                  : 'hover:bg-vintage-teal/10'
+                                  : 'text-vintage-teal/90 hover:bg-vintage-teal/15 hover:text-vintage-teal'
                               }`}
                               whileHover={{ scale: 1.02 }}
                               whileTap={{ scale: 0.98 }}
@@ -327,7 +327,7 @@ export function Player() {
                                 )}
                               </div>
                               {song.cover && (
-                                <div className="text-xs opacity-70 ml-8 mt-1">
+                                <div className="text-xs text-vintage-teal/70 ml-8 mt-1 font-medium">
                                   {song.cover.name} cover
                                 </div>
                               )}
@@ -357,7 +357,7 @@ export function Player() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-vintage-teal/70">{selectedConcert.info}</p>
+                <p className="text-vintage-teal/85 leading-relaxed">{selectedConcert.info}</p>
               </CardContent>
             </Card>
           </motion.div>

@@ -1,7 +1,10 @@
 import type { Artist, Concert } from '@/stores/useConcertStore'
 
 const SETLIST_FM_API_KEY = import.meta.env.VITE_SETLISTFM_API_KEY || 'demo-key'
-const BASE_URL = 'https://api.setlist.fm/rest/1.0'
+// Use proxy in development to avoid CORS issues
+const BASE_URL = import.meta.env.DEV 
+  ? '/api/setlistfm' 
+  : 'https://api.setlist.fm/rest/1.0'
 
 const headers = {
   'x-api-key': SETLIST_FM_API_KEY,
@@ -24,6 +27,9 @@ export async function searchArtists(query: string): Promise<Artist[]> {
     )
 
     if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error('API_KEY_INVALID: Please set a valid VITE_SETLISTFM_API_KEY in your .env file. Get one at https://api.setlist.fm/docs/1.0/index.html')
+      }
       throw new Error(`API error: ${response.status}`)
     }
 
@@ -31,7 +37,7 @@ export async function searchArtists(query: string): Promise<Artist[]> {
     return data.artist as Artist[] || []
   } catch (error) {
     console.error('Error searching artists:', error)
-    return []
+    throw error // Re-throw to allow UI to handle it
   }
 }
 

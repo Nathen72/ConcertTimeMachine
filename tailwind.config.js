@@ -46,7 +46,7 @@ export default {
           cream: '#F5E6D3',
           orange: '#FF6B35',
           teal: '#004E64',
-          yellow: '#F7B32B',
+          yellow: '#64748B', // Changed to slate blue-gray
           brown: '#8B4513',
           sage: '#9CAF88',
         }

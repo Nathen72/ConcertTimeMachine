@@ -24,15 +24,15 @@
     --muted: 60 56 54;
     --muted-foreground: 214 211 209;
 
-    --accent: 247 179 43;
-    --accent-foreground: 28 25 23;
+    --accent: 100 116 139;
+    --accent-foreground: 250 245 235;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 44 40 37;
     --input: 44 40 37;
-    --ring: 247 179 43;
+    --ring: 100 116 139;
 
     --radius: 0.5rem;
   }
@@ -64,7 +64,7 @@
 
     --border: 60 56 54;
     --input: 60 56 54;
-    --ring: 247 179 43;
+    --ring: 100 116 139;
   }
 }
 

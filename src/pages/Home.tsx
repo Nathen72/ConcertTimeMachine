@@ -13,6 +13,7 @@ export function Home() {
   const [query, setQuery] = useState('')
   const [artists, setArtists] = useState<Artist[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const setSelectedArtist = useConcertStore((state) => state.setSelectedArtist)
 
@@ -21,23 +22,13 @@ export function Home() {
     if (!query.trim()) return
 
     setIsLoading(true)
+    setError(null)
     try {
       const results = await searchArtists(query)
-
-      // Fetch Spotify artist info for each result to get photos
-      const artistsWithPhotos = await Promise.all(
-        results.map(async (artist) => {
-          const spotifyInfo = await getArtistInfo(artist.name)
-          return {
-            ...artist,
-            spotifyImage: spotifyInfo?.images?.[0]?.url
-          }
-        })
-      )
-
-      setArtists(artistsWithPhotos)
-    } catch (error) {
-      console.error('Error searching artists:', error)
+      setArtists(results)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while searching'
+      setError(errorMessage)
       setArtists([])
     } finally {
       setIsLoading(false)
@@ -55,7 +46,7 @@ export function Home() {
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 left-10 w-32 h-32 rounded-full bg-vintage-orange/10 blur-3xl" />
         <div className="absolute bottom-20 right-10 w-40 h-40 rounded-full bg-vintage-teal/10 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-vintage-yellow/5 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-vintage-teal/5 blur-3xl" />
       </div>
 
       <motion.div
@@ -82,7 +73,7 @@ export function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="text-xl text-vintage-teal/70 font-medium"
+            className="text-xl text-vintage-teal/85 font-medium"
           >
             Travel back in time to relive legendary concerts through their setlists
           </motion.p>
@@ -144,7 +135,7 @@ export function Home() {
                 transition={{ duration: 0.3, delay: index * 0.1 }}
               >
                 <Card
-                  className="cursor-pointer hover:scale-[1.02] transition-transform overflow-hidden"
+                  className="cursor-pointer transition-all duration-300"
                   onClick={() => handleSelectArtist(artist)}
                 >
                   {artist.spotifyImage && (
@@ -173,11 +164,39 @@ export function Home() {
           </motion.div>
         )}
 
-        {artists.length === 0 && query && !isLoading && (
+        {/* Error Message */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-vintage-orange/10 border-2 border-vintage-orange/30 rounded-lg p-4 shadow-md"
+          >
+            <p className="text-vintage-teal font-medium">
+              {error.includes('API_KEY_INVALID') ? (
+                <>
+                  <strong>API Key Required:</strong> Please set a valid VITE_SETLISTFM_API_KEY in your .env file.{' '}
+                  <a 
+                    href="https://api.setlist.fm/docs/1.0/index.html" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-vintage-teal font-semibold"
+                  >
+                    Get your API key here
+                  </a>
+                </>
+              ) : (
+                error
+              )}
+            </p>
+          </motion.div>
+        )}
+
+        {/* No Results Message */}
+        {artists.length === 0 && query && !isLoading && !error && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center text-vintage-teal/60 text-lg"
+            className="text-center text-vintage-teal/80 text-lg font-medium"
           >
             No artists found. Try a different search.
           </motion.div>
