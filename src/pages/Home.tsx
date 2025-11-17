@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { searchArtists } from '@/api/setlistfm'
 import { useConcertStore, type Artist } from '@/stores/useConcertStore'
+import { getArtistInfo } from '@/api/spotify'
 
 export function Home() {
   const [query, setQuery] = useState('')
@@ -20,9 +21,27 @@ export function Home() {
     if (!query.trim()) return
 
     setIsLoading(true)
-    const results = await searchArtists(query)
-    setArtists(results)
-    setIsLoading(false)
+    try {
+      const results = await searchArtists(query)
+
+      // Fetch Spotify artist info for each result to get photos
+      const artistsWithPhotos = await Promise.all(
+        results.map(async (artist) => {
+          const spotifyInfo = await getArtistInfo(artist.name)
+          return {
+            ...artist,
+            spotifyImage: spotifyInfo?.images?.[0]?.url
+          }
+        })
+      )
+
+      setArtists(artistsWithPhotos)
+    } catch (error) {
+      console.error('Error searching artists:', error)
+      setArtists([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSelectArtist = (artist: Artist) => {
@@ -125,12 +144,23 @@ export function Home() {
                 transition={{ duration: 0.3, delay: index * 0.1 }}
               >
                 <Card
-                  className="cursor-pointer hover:scale-[1.02] transition-transform"
+                  className="cursor-pointer hover:scale-[1.02] transition-transform overflow-hidden"
                   onClick={() => handleSelectArtist(artist)}
                 >
+                  {artist.spotifyImage && (
+                    <div className="w-full h-48 overflow-hidden">
+                      <img
+                        src={artist.spotifyImage}
+                        alt={artist.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                   <CardHeader>
                     <CardTitle className="text-xl flex items-center gap-2">
-                      <Music className="w-5 h-5 text-vintage-orange" />
+                      {!artist.spotifyImage && (
+                        <Music className="w-5 h-5 text-vintage-orange" />
+                      )}
                       {artist.name}
                     </CardTitle>
                     {artist.disambiguation && (

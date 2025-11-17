@@ -10,11 +10,14 @@ import {
   SkipBack,
   SkipForward,
   Music2,
-  Info
+  Info,
+  LogIn
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useConcertStore } from '@/stores/useConcertStore'
+import { searchTrack, isUserAuthenticated, getAuthorizationUrl } from '@/api/spotify'
+import { useSpotifyPlayer } from '@/hooks/useSpotifyPlayer'
 
 export function Player() {
   const navigate = useNavigate()
@@ -25,10 +28,16 @@ export function Player() {
     setIsPlaying,
     nextSong,
     previousSong,
-    setCurrentSongIndex
+    setCurrentSongIndex,
+    currentSpotifyTrack,
+    setCurrentSpotifyTrack
   } = useConcertStore()
 
   const [allSongs, setAllSongs] = useState<any[]>([])
+  const [isAuthenticated] = useState(isUserAuthenticated())
+
+  // Initialize Spotify player if authenticated
+  const spotifyPlayer = useSpotifyPlayer()
 
   useEffect(() => {
     if (!selectedConcert) {
@@ -49,6 +58,37 @@ export function Player() {
     setAllSongs(songs)
   }, [selectedConcert])
 
+  // Search for the current song on Spotify when it changes
+  useEffect(() => {
+    const currentSong = allSongs[currentSongIndex]
+    if (!currentSong || !selectedConcert) return
+
+    const searchForTrack = async () => {
+      try {
+        // Use the cover artist if this is a cover, otherwise use the concert artist
+        const artistName = currentSong.cover?.name || selectedConcert.artist.name
+        const track = await searchTrack(artistName, currentSong.name)
+        setCurrentSpotifyTrack(track)
+      } catch (error) {
+        console.error('Error searching for track:', error)
+        setCurrentSpotifyTrack(null)
+      }
+    }
+
+    searchForTrack()
+  }, [currentSongIndex, allSongs, selectedConcert, setCurrentSpotifyTrack])
+
+  // Handle playback when play/pause is toggled
+  useEffect(() => {
+    if (!isAuthenticated || !spotifyPlayer.isReady || !currentSpotifyTrack) return
+
+    if (isPlaying) {
+      spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+    } else {
+      spotifyPlayer.togglePlayPause()
+    }
+  }, [isPlaying, currentSpotifyTrack, isAuthenticated])
+
   if (!selectedConcert) return null
 
   const currentSong = allSongs[currentSongIndex]
@@ -65,7 +105,17 @@ export function Player() {
   }
 
   const handlePlayPause = () => {
+    if (!isAuthenticated) {
+      handleSpotifyLogin()
+      return
+    }
     setIsPlaying(!isPlaying)
+  }
+
+  const handleSpotifyLogin = () => {
+    // Save current location to return to after auth
+    localStorage.setItem('spotify_auth_return_to', window.location.pathname)
+    window.location.href = getAuthorizationUrl()
   }
 
   return (
@@ -103,6 +153,17 @@ export function Player() {
               </div>
             </div>
           </div>
+
+          {!isAuthenticated && (
+            <Button
+              variant="vintage"
+              onClick={handleSpotifyLogin}
+              className="flex items-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              Connect Spotify
+            </Button>
+          )}
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -129,8 +190,16 @@ export function Player() {
                     className="relative"
                   >
                     <div className="w-64 h-64 rounded-full bg-gradient-to-br from-vintage-teal to-vintage-orange shadow-2xl flex items-center justify-center">
-                      <div className="w-20 h-20 rounded-full bg-vintage-cream shadow-inner flex items-center justify-center">
-                        <Music2 className="w-10 h-10 text-vintage-teal" />
+                      <div className="w-20 h-20 rounded-full bg-vintage-cream shadow-inner flex items-center justify-center overflow-hidden">
+                        {currentSpotifyTrack?.album?.images?.[0]?.url ? (
+                          <img
+                            src={currentSpotifyTrack.album.images[0].url}
+                            alt={currentSpotifyTrack.album.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <Music2 className="w-10 h-10 text-vintage-teal" />
+                        )}
                       </div>
                     </div>
                   </motion.div>
