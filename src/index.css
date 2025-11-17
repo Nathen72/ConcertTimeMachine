@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 42 35 28;
+    --foreground: 28 25 23;
+
+    --card: 39 35 31;
+    --card-foreground: 250 245 235;
+
+    --popover: 39 35 31;
+    --popover-foreground: 250 245 235;
+
+    --primary: 15 32 50;
+    --primary-foreground: 245 230 211;
+
+    --secondary: 152 175 136;
+    --secondary-foreground: 28 25 23;
+
+    --muted: 60 56 54;
+    --muted-foreground: 214 211 209;
+
+    --accent: 247 179 43;
+    --accent-foreground: 28 25 23;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 44 40 37;
+    --input: 44 40 37;
+    --ring: 247 179 43;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 28 25 23;
+    --foreground: 250 245 235;
+
+    --card: 39 35 31;
+    --card-foreground: 250 245 235;
+
+    --popover: 39 35 31;
+    --popover-foreground: 250 245 235;
+
+    --primary: 245 230 211;
+    --primary-foreground: 28 25 23;
+
+    --secondary: 60 56 54;
+    --secondary-foreground: 250 245 235;
+
+    --muted: 60 56 54;
+    --muted-foreground: 163 163 163;
+
+    --accent: 60 56 54;
+    --accent-foreground: 250 245 235;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 250 245 235;
+
+    --border: 60 56 54;
+    --input: 60 56 54;
+    --ring: 247 179 43;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-vintage-cream text-foreground min-h-screen font-sans antialiased;
+    background-image:
+      radial-gradient(circle at 25% 25%, rgba(255, 107, 53, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(0, 78, 100, 0.05) 0%, transparent 50%);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
