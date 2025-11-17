@@ -19,10 +19,25 @@ export default function SpotifyCallback() {
       const params = new URLSearchParams(window.location.search)
       const code = params.get('code')
       const errorParam = params.get('error')
+      const errorDescription = params.get('error_description')
 
       if (errorParam) {
-        setError('Failed to authorize with Spotify')
-        setTimeout(() => navigate('/'), 3000)
+        let errorMsg = 'Failed to authorize with Spotify'
+        
+        // Provide specific error messages
+        if (errorParam === 'access_denied') {
+          errorMsg = 'Access denied. Please authorize the app to continue.'
+        } else if (errorParam === 'invalid_request') {
+          errorMsg = 'Invalid request. Please check your Spotify app configuration in the Developer Dashboard.'
+        } else if (errorDescription) {
+          errorMsg = `Spotify error: ${decodeURIComponent(errorDescription)}`
+        } else {
+          errorMsg = `Spotify error: ${errorParam}`
+        }
+        
+        console.error('Spotify authorization error:', errorParam, errorDescription)
+        setError(errorMsg)
+        setTimeout(() => navigate('/'), 5000)
         return
       }
 
@@ -42,8 +57,9 @@ export default function SpotifyCallback() {
         navigate(returnTo)
       } catch (err) {
         console.error('Error exchanging code for token:', err)
-        setError('Failed to authenticate with Spotify')
-        setTimeout(() => navigate('/'), 3000)
+        const errorMessage = err instanceof Error ? err.message : 'Failed to authenticate with Spotify'
+        setError(errorMessage)
+        setTimeout(() => navigate('/'), 5000) // Give user more time to read the error
       }
     }
 

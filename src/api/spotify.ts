@@ -5,13 +5,50 @@
  * Supports both Client Credentials flow (for search) and Authorization Code flow (for playback)
  */
 
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID
-const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET
-const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://localhost:5173/callback'
+const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim()
+const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET?.trim()
+// Spotify no longer allows 'localhost' - must use 127.0.0.1
+const REDIRECT_URI = (import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback').trim()
 
 // Token storage
 let accessToken: string | null = null
 let tokenExpiry: number | null = null
+
+/**
+ * Verify Spotify credentials are valid
+ * This can help diagnose configuration issues
+ */
+export async function verifySpotifyCredentials(): Promise<{ valid: boolean; error?: string }> {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    return { valid: false, error: 'Client ID or Client Secret not set' }
+  }
+
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)
+      },
+      body: 'grant_type=client_credentials'
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      return { 
+        valid: false, 
+        error: errorData.error_description || errorData.error || `HTTP ${response.status}` 
+      }
+    }
+
+    return { valid: true }
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
+  }
+}
 
 /**
  * Get access token using Client Credentials flow
@@ -33,7 +70,9 @@ async function getClientCredentialsToken(): Promise<string> {
   })
 
   if (!response.ok) {
-    throw new Error('Failed to authenticate with Spotify')
+    const errorData = await response.json().catch(() => ({}))
+    const errorMsg = errorData.error_description || errorData.error || 'Failed to authenticate with Spotify'
+    throw new Error(`Spotify authentication failed: ${errorMsg}`)
   }
 
   const data = await response.json()
@@ -79,6 +118,14 @@ export function clearUserAccessToken() {
  * Generate authorization URL for user login
  */
 export function getAuthorizationUrl(): string {
+  if (!CLIENT_ID) {
+    throw new Error('VITE_SPOTIFY_CLIENT_ID is not set in environment variables')
+  }
+
+  if (!REDIRECT_URI) {
+    throw new Error('VITE_SPOTIFY_REDIRECT_URI is not set in environment variables')
+  }
+
   const scopes = [
     'streaming',
     'user-read-email',
@@ -87,21 +134,61 @@ export function getAuthorizationUrl(): string {
     'user-read-playback-state'
   ]
 
+  // Log the redirect URI for debugging (only in development)
+  if (import.meta.env.DEV) {
+    console.log('🔍 Spotify Configuration Check:')
+    console.log('  Client ID:', CLIENT_ID ? `${CLIENT_ID.substring(0, 8)}...${CLIENT_ID.substring(CLIENT_ID.length - 4)}` : '❌ NOT SET')
+    console.log('  Redirect URI:', REDIRECT_URI)
+    console.log('  Redirect URI length:', REDIRECT_URI.length, 'characters')
+    console.log('  Redirect URI encoded:', encodeURIComponent(REDIRECT_URI))
+    console.log('')
+    console.log('⚠️  If you see a 400 error, verify:')
+    console.log('  1. The redirect URI above matches EXACTLY in Spotify Dashboard')
+    console.log('  2. No extra spaces or characters')
+    console.log('  3. Client ID is correct')
+    console.log('  4. Dashboard URL: https://developer.spotify.com/dashboard')
+    console.log('')
+  }
+
   const params = new URLSearchParams({
-    client_id: CLIENT_ID!,
+    client_id: CLIENT_ID,
     response_type: 'code',
     redirect_uri: REDIRECT_URI,
     scope: scopes.join(' '),
     show_dialog: 'false'
   })
 
-  return `https://accounts.spotify.com/authorize?${params.toString()}`
+  const authUrl = `https://accounts.spotify.com/authorize?${params.toString()}`
+  
+  if (import.meta.env.DEV) {
+    console.group('🔍 Spotify Authorization Debug Info')
+    console.log('Client ID:', CLIENT_ID)
+    console.log('Redirect URI:', REDIRECT_URI)
+    console.log('Redirect URI (encoded):', encodeURIComponent(REDIRECT_URI))
+    console.log('Full Authorization URL:', authUrl)
+    console.log('')
+    console.log('⚠️  TROUBLESHOOTING 400 ERROR:')
+    console.log('1. Copy the Redirect URI above')
+    console.log('2. Go to: https://developer.spotify.com/dashboard')
+    console.log('3. Select your app → Edit Settings')
+    console.log('4. In "Redirect URIs", verify the URI matches EXACTLY')
+    console.log('5. If not there, add it and click SAVE')
+    console.log('6. Wait 30 seconds for changes to propagate')
+    console.log('7. Try again')
+    console.groupEnd()
+  }
+  
+  return authUrl
 }
 
 /**
  * Exchange authorization code for access token
  */
 export async function exchangeCodeForToken(code: string): Promise<void> {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    throw new Error('Spotify credentials are not configured. Please set VITE_SPOTIFY_CLIENT_ID and VITE_SPOTIFY_CLIENT_SECRET in your .env file.')
+  }
+
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -116,7 +203,19 @@ export async function exchangeCodeForToken(code: string): Promise<void> {
   })
 
   if (!response.ok) {
-    throw new Error('Failed to exchange code for token')
+    const errorData = await response.json().catch(() => ({}))
+    const errorMessage = errorData.error_description || errorData.error || 'Failed to exchange code for token'
+    
+    // Provide helpful error message for redirect URI issues
+    if (errorMessage.includes('redirect_uri') || errorMessage.includes('INVALID_CLIENT')) {
+      throw new Error(
+        `Redirect URI mismatch. The redirect URI "${REDIRECT_URI}" must be added in your Spotify Developer Dashboard. ` +
+        `Go to https://developer.spotify.com/dashboard, select your app, click "Edit Settings", ` +
+        `and add "${REDIRECT_URI}" to the "Redirect URIs" list.`
+      )
+    }
+    
+    throw new Error(errorMessage)
   }
 
   const data = await response.json()

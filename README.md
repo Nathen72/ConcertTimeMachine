@@ -67,14 +67,25 @@ cp .env.example .env
 5. Set up Spotify API (for music playback and artist photos):
    - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
    - Create a new app
-   - Add `http://localhost:5173/callback` as a Redirect URI in your app settings
+   - **IMPORTANT**: Click "Edit Settings" on your app
+   - In the "Redirect URIs" section, add exactly: `http://127.0.0.1:5173/callback`
+     - ⚠️ **Note**: Spotify no longer allows `localhost` - you must use `127.0.0.1`
+     - The URI must match **exactly** (including the protocol `http://`, no trailing slash)
+     - If you're using a different port, update the URI accordingly
    - Copy your Client ID and Client Secret
    - Add them to `.env`:
    ```env
    VITE_SPOTIFY_CLIENT_ID=your_client_id
    VITE_SPOTIFY_CLIENT_SECRET=your_client_secret
-   VITE_SPOTIFY_REDIRECT_URI=http://localhost:5173/callback
+   VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173/callback
    ```
+   
+   **Troubleshooting "INVALID_CLIENT: Insecure redirect URI" error:**
+   - Make sure the redirect URI in your `.env` file matches exactly what's in Spotify Dashboard
+   - Check that there are no trailing slashes or extra characters
+   - Verify the port number matches (default is 5173 for Vite)
+   - The URI must be added in the Spotify Dashboard before it will work
+   - After adding the URI in Spotify Dashboard, wait a few seconds for changes to propagate
 
 6. Start the development server:
 ```bash

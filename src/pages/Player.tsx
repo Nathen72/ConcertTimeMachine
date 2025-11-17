@@ -113,9 +113,30 @@ export function Player() {
   }
 
   const handleSpotifyLogin = () => {
-    // Save current location to return to after auth
-    localStorage.setItem('spotify_auth_return_to', window.location.pathname)
-    window.location.href = getAuthorizationUrl()
+    try {
+      // Save current location to return to after auth
+      localStorage.setItem('spotify_auth_return_to', window.location.pathname)
+      const authUrl = getAuthorizationUrl()
+      
+      // Additional validation before redirecting
+      if (import.meta.env.DEV) {
+        console.log('🚀 Redirecting to Spotify authorization...')
+        console.log('📋 Full URL:', authUrl)
+        console.log('')
+        console.log('💡 If you get a 400 error:')
+        console.log('   1. Check the console above for the exact Redirect URI')
+        console.log('   2. Go to https://developer.spotify.com/dashboard')
+        console.log('   3. Select your app → Edit Settings')
+        console.log('   4. Verify the Redirect URI matches EXACTLY (copy-paste to be sure)')
+        console.log('   5. Make sure you clicked "Save" in the Dashboard')
+        console.log('')
+      }
+      
+      window.location.href = authUrl
+    } catch (error) {
+      console.error('❌ Error generating authorization URL:', error)
+      alert(error instanceof Error ? error.message : 'Failed to generate Spotify authorization URL. Please check your configuration.')
+    }
   }
 
   return (
@@ -155,14 +176,29 @@ export function Player() {
           </div>
 
           {!isAuthenticated && (
-            <Button
-              variant="vintage"
-              onClick={handleSpotifyLogin}
-              className="flex items-center gap-2"
-            >
-              <LogIn className="w-4 h-4" />
-              Connect Spotify
-            </Button>
+            <div className="flex flex-col items-end gap-2">
+              <Button
+                variant="vintage"
+                onClick={handleSpotifyLogin}
+                className="flex items-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Connect Spotify
+              </Button>
+              {import.meta.env.DEV && (
+                <div className="text-xs text-vintage-teal/60 text-right max-w-xs space-y-1">
+                  <p>
+                    If you see a 400 error, check the browser console (F12) for detailed logs.
+                  </p>
+                  <p className="font-mono text-[10px] bg-vintage-cream/50 px-1 rounded break-all">
+                    {import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'}
+                  </p>
+                  <p className="text-[10px]">
+                    Make sure this EXACT URI is in Spotify Dashboard → Edit Settings → Redirect URIs
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </motion.div>
 

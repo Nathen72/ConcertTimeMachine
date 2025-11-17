@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '127.0.0.1', // Ensure server is accessible on 127.0.0.1 for Spotify redirect
       proxy: {
         '/api/setlistfm': {
           target: 'https://api.setlist.fm/rest/1.0',
