@@ -72,7 +72,7 @@ export function Concerts() {
             <h1 className="text-5xl font-display font-bold text-vintage-teal">
               {selectedArtist.name}
             </h1>
-            <p className="text-xl text-vintage-teal/70">
+            <p className="text-xl text-vintage-teal/85 font-medium">
               Select a concert to relive the experience
             </p>
           </div>
@@ -116,7 +116,7 @@ export function Concerts() {
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                 >
                   <Card
-                    className="cursor-pointer hover:scale-[1.02] transition-all h-full"
+                    className="cursor-pointer transition-all duration-300 h-full"
                     onClick={() => handleSelectConcert(concert)}
                   >
                     <CardHeader>
@@ -138,7 +138,7 @@ export function Concerts() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center gap-2 text-vintage-teal/70">
+                      <div className="flex items-center gap-2 text-vintage-teal/80">
                         <Music className="w-4 h-4" />
                         <span className="text-sm font-medium">
                           {songCount} {songCount === 1 ? 'song' : 'songs'}
@@ -163,7 +163,7 @@ export function Concerts() {
             <h2 className="text-2xl font-display font-semibold text-vintage-teal mb-2">
               No concerts found
             </h2>
-            <p className="text-vintage-teal/60">
+            <p className="text-vintage-teal/80 font-medium">
               This artist doesn't have any concerts in the database yet.
             </p>
           </motion.div>
