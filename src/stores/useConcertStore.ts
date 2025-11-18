@@ -89,7 +89,7 @@ export const useConcertStore = create<ConcertStore>((set, get) => ({
 
   setSelectedArtist: (artist) => set({ selectedArtist: artist }),
   setConcerts: (concerts) => set({ concerts }),
-  setSelectedConcert: (concert) => set({ selectedConcert: concert, currentSongIndex: 0 }),
+  setSelectedConcert: (concert) => set({ selectedConcert: concert, currentSongIndex: 0, isPlaying: false }),
   setCurrentSongIndex: (index) => set({ currentSongIndex: index }),
   setIsPlaying: (isPlaying) => set({ isPlaying }),
   setCurrentSpotifyTrack: (track) => set({ currentSpotifyTrack: track }),

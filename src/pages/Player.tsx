@@ -78,16 +78,18 @@ export function Player() {
     searchForTrack()
   }, [currentSongIndex, allSongs, selectedConcert, setCurrentSpotifyTrack])
 
-  // Handle playback when play/pause is toggled
+  // Auto-play new track when it changes (if already playing)
   useEffect(() => {
     if (!isAuthenticated || !spotifyPlayer.isReady || !currentSpotifyTrack) return
+    if (!isPlaying) return // Only auto-play if we're already in playing state
 
-    if (isPlaying) {
-      spotifyPlayer.playTrack(currentSpotifyTrack.uri)
-    } else {
-      spotifyPlayer.togglePlayPause()
+    const playNewTrack = async () => {
+      console.log('Playing new track:', currentSpotifyTrack.name)
+      await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
     }
-  }, [isPlaying, currentSpotifyTrack, isAuthenticated])
+
+    playNewTrack()
+  }, [currentSpotifyTrack, isAuthenticated, spotifyPlayer.isReady, isPlaying])
 
   if (!selectedConcert) return null
 
@@ -104,12 +106,33 @@ export function Player() {
     })
   }
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     if (!isAuthenticated) {
       handleSpotifyLogin()
       return
     }
-    setIsPlaying(!isPlaying)
+
+    if (!spotifyPlayer.isReady || !currentSpotifyTrack) {
+      // If player not ready, just start playing the current track
+      setIsPlaying(true)
+      if (spotifyPlayer.isReady && currentSpotifyTrack) {
+        await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+      }
+      return
+    }
+
+    // Use player's pause state as source of truth
+    if (spotifyPlayer.isPaused) {
+      // Currently paused, so resume
+      if (currentSpotifyTrack) {
+        await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+      }
+      setIsPlaying(true)
+    } else {
+      // Currently playing, so pause
+      await spotifyPlayer.togglePlayPause()
+      setIsPlaying(false)
+    }
   }
 
   const handleSpotifyLogin = () => {
