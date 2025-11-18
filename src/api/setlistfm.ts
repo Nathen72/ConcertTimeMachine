@@ -34,7 +34,17 @@ export async function searchArtists(query: string): Promise<Artist[]> {
     }
 
     const data: SetlistFMResponse<Artist> = await response.json()
-    return data.artist as Artist[] || []
+    const artists = data.artist as Artist[] || []
+
+    // Filter out artists with no concerts
+    const artistsWithConcerts = await Promise.all(
+      artists.map(async (artist) => {
+        const { total } = await getArtistSetlists(artist.mbid, 1)
+        return total > 0 ? artist : null
+      })
+    )
+
+    return artistsWithConcerts.filter((artist): artist is Artist => artist !== null)
   } catch (error) {
     console.error('Error searching artists:', error)
     throw error // Re-throw to allow UI to handle it

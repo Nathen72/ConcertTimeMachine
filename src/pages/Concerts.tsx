@@ -29,7 +29,17 @@ export function Concerts() {
 
     setIsLoading(true)
     const { setlists, total } = await getArtistSetlists(selectedArtist.mbid, page)
-    setConcerts(setlists)
+
+    // Filter out concerts with no songs
+    const concertsWithSongs = setlists.filter((concert) => {
+      const songCount = concert.sets?.set?.reduce(
+        (acc, set) => acc + (set.song?.length || 0),
+        0
+      ) || 0
+      return songCount > 0
+    })
+
+    setConcerts(concertsWithSongs)
     setTotalPages(Math.ceil(total / 20))
     setIsLoading(false)
   }
