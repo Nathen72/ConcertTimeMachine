@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, Music, Clock } from 'lucide-react'
+import { Search, Music, Play, Disc } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { searchArtists } from '@/api/setlistfm'
 import { useConcertStore, type Artist } from '@/stores/useConcertStore'
-import { getArtistInfo } from '@/api/spotify'
 
 export function Home() {
   const [query, setQuery] = useState('')
@@ -41,167 +40,160 @@ export function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-10 w-32 h-32 rounded-full bg-vintage-orange/10 blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-40 h-40 rounded-full bg-vintage-teal/10 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-vintage-teal/5 blur-3xl" />
-      </div>
-
+    <div className="flex flex-col items-center justify-center w-full max-w-5xl mx-auto space-y-8 pt-4 md:pt-8">
+      
+      {/* Main Search "Tape Label" */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="max-w-4xl w-full space-y-8 relative z-10"
+        className="w-full relative"
       >
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <motion.div
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex items-center justify-center gap-3"
-          >
-            <Clock className="w-12 h-12 text-vintage-orange" strokeWidth={2} />
-            <h1 className="text-6xl font-display font-bold text-vintage-teal">
-              Concert Time Machine
-            </h1>
-            <Music className="w-12 h-12 text-vintage-orange" strokeWidth={2} />
-          </motion.div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="text-xl text-vintage-teal/85 font-medium"
-          >
-            Travel back in time to relive legendary concerts through their setlists
-          </motion.p>
-        </div>
+         {/* Tape Label Container */}
+         <div className="bg-cassette-label p-8 md:p-12 rounded-lg shadow-lg border border-gray-200 relative overflow-hidden cassette-shadow">
+            {/* Decorative Stripes */}
+            <div className="absolute top-0 left-0 w-full h-3 bg-vintage-orange opacity-80" />
+            <div className="absolute top-4 left-0 w-full h-1 bg-vintage-teal opacity-60" />
+            
+            {/* Texture Overlay */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 3h1v1H1V3zm2-2h1v1H3V1z' fill='%23000' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")` }} />
 
-        {/* Search Form */}
+            <div className="text-center space-y-6 relative z-10">
+               <div className="font-cassette text-lg md:text-xl text-vintage-teal/60 tracking-[0.3em]">
+                  CONCERT TIME MACHINE
+               </div>
+               
+               <h1 className="text-5xl md:text-7xl font-display font-bold text-vintage-teal tracking-tight">
+                  ARTIST SEARCH
+               </h1>
+
+               <p className="text-vintage-teal/70 font-mono text-sm md:text-base max-w-lg mx-auto">
+                 INSERT ARTIST NAME TO RETRIEVE ARCHIVED SETLISTS
+               </p>
+
+               {/* Search Input styled as handwritten label field */}
+               <form onSubmit={handleSearch} className="max-w-lg mx-auto mt-8 relative">
+                  <div className="relative flex items-center bg-white rounded-md border-2 border-vintage-teal/30 shadow-inner overflow-hidden focus-within:border-vintage-orange transition-colors">
+                     <div className="pl-4 text-vintage-teal/40">
+                       <Search className="w-5 h-5" />
+                     </div>
+                     <input
+                       type="text"
+                       className="flex-1 px-4 py-4 bg-transparent border-none outline-none text-xl font-display text-vintage-teal placeholder:text-vintage-teal/30 placeholder:font-mono uppercase"
+                       placeholder="Artist Name..."
+                       value={query}
+                       onChange={(e) => setQuery(e.target.value)}
+                       autoFocus
+                     />
+                     <button 
+                       type="submit"
+                       disabled={isLoading}
+                       className="px-6 py-4 bg-vintage-teal text-vintage-cream font-bold font-mono uppercase hover:bg-vintage-orange disabled:opacity-50 transition-all duration-200 border-l-2 border-vintage-teal/30"
+                     >
+                       {isLoading ? 'LOADING...' : 'PLAY'}
+                     </button>
+                  </div>
+               </form>
+            </div>
+         </div>
+      </motion.div>
+
+      {/* Results Grid - Mini Tapes */}
+      {artists.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="grid gap-6 md:grid-cols-2 w-full"
         >
-          <Card className="shadow-2xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-6 h-6" />
-                Search for an Artist
-              </CardTitle>
-              <CardDescription>
-                Find your favorite artist to explore their concert history
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSearch} className="flex gap-3">
-                <Input
-                  type="text"
-                  placeholder="Enter artist name..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  className="text-lg"
-                  autoFocus
-                />
-                <Button
-                  type="submit"
-                  variant="vintage"
-                  size="lg"
-                  disabled={isLoading}
-                  className="min-w-[120px]"
-                >
-                  {isLoading ? 'Searching...' : 'Search'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Results */}
-        {artists.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="grid gap-4 md:grid-cols-2"
-          >
-            {artists.map((artist, index) => (
-              <motion.div
-                key={artist.mbid}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
+          {artists.map((artist, index) => (
+            <motion.div
+              key={artist.mbid}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+            >
+              <div
+                className="group cursor-pointer relative h-32 md:h-40 bg-cassette-dark rounded-lg shadow-xl overflow-hidden transform transition-transform hover:scale-[1.02] hover:rotate-1"
+                onClick={() => handleSelectArtist(artist)}
               >
-                <Card
-                  className="cursor-pointer transition-all duration-300"
-                  onClick={() => handleSelectArtist(artist)}
-                >
-                  {artist.spotifyImage && (
-                    <div className="w-full h-48 overflow-hidden">
-                      <img
-                        src={artist.spotifyImage}
-                        alt={artist.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      {!artist.spotifyImage && (
-                        <Music className="w-5 h-5 text-vintage-orange" />
+                {/* Cassette Body */}
+                <div className="absolute inset-1 bg-cassette-body rounded flex items-center p-2 md:p-3 gap-4 border border-gray-300">
+                   
+                   {/* "Reel" Window / Image */}
+                   <div className="w-24 h-full bg-cassette-window rounded-md relative overflow-hidden shadow-inner flex-shrink-0 border border-gray-600">
+                      {artist.spotifyImage ? (
+                        <img
+                          src={artist.spotifyImage}
+                          alt={artist.name}
+                          className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center opacity-30">
+                           <Disc className="w-12 h-12 text-white animate-spin-slow" />
+                        </div>
                       )}
-                      {artist.name}
-                    </CardTitle>
-                    {artist.disambiguation && (
-                      <CardDescription>{artist.disambiguation}</CardDescription>
-                    )}
-                  </CardHeader>
-                </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
+                      {/* Window Glare */}
+                      <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-white/10 to-transparent pointer-events-none" />
+                   </div>
 
-        {/* Error Message */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-vintage-orange/10 border-2 border-vintage-orange/30 rounded-lg p-4 shadow-md"
-          >
-            <p className="text-vintage-teal font-medium">
+                   {/* Label Area */}
+                   <div className="flex-1 flex flex-col justify-center min-w-0 bg-cassette-label h-full rounded-sm px-4 py-2 shadow-sm relative border border-gray-200">
+                      {/* Label Lines */}
+                      <div className="absolute top-2 left-0 w-full h-[1px] bg-vintage-teal/10" />
+                      <div className="absolute bottom-2 left-0 w-full h-[1px] bg-vintage-teal/10" />
+                      
+                      <h3 className="font-display font-bold text-xl md:text-2xl text-vintage-teal truncate">
+                        {artist.name}
+                      </h3>
+                      {artist.disambiguation && (
+                        <p className="font-mono text-xs text-vintage-teal/60 truncate uppercase tracking-tighter">
+                          {artist.disambiguation}
+                        </p>
+                      )}
+                      
+                      {/* Side Indicator */}
+                      <div className="absolute right-2 top-2 font-mono text-[10px] text-vintage-orange font-bold border border-vintage-orange px-1 rounded">
+                        A
+                      </div>
+                   </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full bg-vintage-orange/10 border-2 border-vintage-orange/30 rounded-lg p-6 shadow-md text-center font-mono"
+        >
+           <p className="text-vintage-teal font-bold text-lg">TAPE EJECTED: ERROR</p>
+           <p className="text-vintage-teal/80 mt-2">
               {error.includes('API_KEY_INVALID') ? (
                 <>
-                  <strong>API Key Required:</strong> Please set a valid VITE_SETLISTFM_API_KEY in your .env file.{' '}
-                  <a 
-                    href="https://api.setlist.fm/docs/1.0/index.html" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="underline hover:text-vintage-teal font-semibold"
-                  >
-                    Get your API key here
-                  </a>
+                  API Key Required. Please check system configuration.
                 </>
               ) : (
                 error
               )}
             </p>
-          </motion.div>
-        )}
+        </motion.div>
+      )}
 
-        {/* No Results Message */}
-        {artists.length === 0 && query && !isLoading && !error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center text-vintage-teal/80 text-lg font-medium"
-          >
-            No artists found. Try a different search.
-          </motion.div>
-        )}
-      </motion.div>
+      {/* Empty State */}
+      {artists.length === 0 && query && !isLoading && !error && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center text-vintage-teal/60 font-mono tracking-widest py-12"
+        >
+           [ NO RECORDINGS FOUND ]
+        </motion.div>
+      )}
     </div>
   )
 }

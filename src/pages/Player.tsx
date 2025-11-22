@@ -11,10 +11,10 @@ import {
   SkipForward,
   Music2,
   Info,
-  LogIn
+  LogIn,
+  Disc
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useConcertStore } from '@/stores/useConcertStore'
 import { searchTrack, isUserAuthenticated, getAuthorizationUrl } from '@/api/spotify'
 import { useSpotifyPlayer } from '@/hooks/useSpotifyPlayer'
@@ -36,7 +36,6 @@ export function Player() {
   const [allSongs, setAllSongs] = useState<any[]>([])
   const [isAuthenticated] = useState(isUserAuthenticated())
 
-  // Initialize Spotify player if authenticated
   const spotifyPlayer = useSpotifyPlayer()
 
   useEffect(() => {
@@ -45,7 +44,6 @@ export function Player() {
       return
     }
 
-    // Flatten all songs from all sets
     const songs = selectedConcert.sets?.set?.flatMap((set, setIndex) =>
       set.song.map((song, songIndex) => ({
         ...song,
@@ -58,14 +56,12 @@ export function Player() {
     setAllSongs(songs)
   }, [selectedConcert])
 
-  // Search for the current song on Spotify when it changes
   useEffect(() => {
     const currentSong = allSongs[currentSongIndex]
     if (!currentSong || !selectedConcert) return
 
     const searchForTrack = async () => {
       try {
-        // Use the cover artist if this is a cover, otherwise use the concert artist
         const artistName = currentSong.cover?.name || selectedConcert.artist.name
         const track = await searchTrack(artistName, currentSong.name)
         setCurrentSpotifyTrack(track)
@@ -78,18 +74,56 @@ export function Player() {
     searchForTrack()
   }, [currentSongIndex, allSongs, selectedConcert, setCurrentSpotifyTrack])
 
-  // Auto-play new track when it changes (if already playing)
   useEffect(() => {
-    if (!isAuthenticated || !spotifyPlayer.isReady || !currentSpotifyTrack) return
-    if (!isPlaying) return // Only auto-play if we're already in playing state
+    // Sync external player state (e.g. from Spotify app or auto-pause) to local state
+    if (spotifyPlayer.isReady) {
+      if (spotifyPlayer.isPaused && isPlaying) {
+        setIsPlaying(false)
+      } else if (!spotifyPlayer.isPaused && !isPlaying) {
+        setIsPlaying(true)
+      }
+    }
+  }, [spotifyPlayer.isPaused, spotifyPlayer.isReady])
 
-    const playNewTrack = async () => {
-      console.log('Playing new track:', currentSpotifyTrack.name)
-      await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+  useEffect(() => {
+    if (!isAuthenticated || !currentSpotifyTrack) return
+
+    const managePlayback = async () => {
+      // If player is not ready, we can't do much yet, but if we have a track and user wants to play,
+      // we might be waiting for the player to initialize.
+
+      if (isPlaying) {
+        if (spotifyPlayer.isReady) {
+          // If we are paused but should be playing, resume or play new track
+          if (spotifyPlayer.isPaused) {
+            // Check if we need to play a new track or just resume
+            const currentUri = spotifyPlayer.currentTrack?.uri
+            if (currentUri !== currentSpotifyTrack.uri) {
+              await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+            } else {
+              await spotifyPlayer.togglePlayPause()
+            }
+          } else {
+            // Already playing, check if it's the right track
+            const currentUri = spotifyPlayer.currentTrack?.uri
+            if (currentUri !== currentSpotifyTrack.uri) {
+              await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
+            }
+          }
+        } else {
+          // Player not ready, maybe try fallback or just wait (the hook handles fallback internally if we call playTrack)
+          // But here we just wait for isReady to become true
+        }
+      } else {
+        // We should be paused
+        if (spotifyPlayer.isReady && !spotifyPlayer.isPaused) {
+          await spotifyPlayer.togglePlayPause()
+        }
+      }
     }
 
-    playNewTrack()
-  }, [currentSpotifyTrack, isAuthenticated, spotifyPlayer.isReady, isPlaying])
+    managePlayback()
+  }, [isPlaying, currentSpotifyTrack, spotifyPlayer.isReady, isAuthenticated])
 
   if (!selectedConcert) return null
 
@@ -112,315 +146,259 @@ export function Player() {
       return
     }
 
-    if (!spotifyPlayer.isReady || !currentSpotifyTrack) {
-      // If player not ready, just start playing the current track
-      setIsPlaying(true)
-      if (spotifyPlayer.isReady && currentSpotifyTrack) {
-        await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
-      }
-      return
-    }
-
-    // Use player's pause state as source of truth
-    if (spotifyPlayer.isPaused) {
-      // Currently paused, so resume
-      if (currentSpotifyTrack) {
-        await spotifyPlayer.playTrack(currentSpotifyTrack.uri)
-      }
-      setIsPlaying(true)
-    } else {
-      // Currently playing, so pause
-      await spotifyPlayer.togglePlayPause()
-      setIsPlaying(false)
-    }
+    await spotifyPlayer.activateElement()
+    setIsPlaying(!isPlaying)
   }
 
   const handleSpotifyLogin = () => {
     try {
-      // Save current location to return to after auth
       localStorage.setItem('spotify_auth_return_to', window.location.pathname)
-      const authUrl = getAuthorizationUrl()
-      
-      // Additional validation before redirecting
-      if (import.meta.env.DEV) {
-        console.log('🚀 Redirecting to Spotify authorization...')
-        console.log('📋 Full URL:', authUrl)
-        console.log('')
-        console.log('💡 If you get a 400 error:')
-        console.log('   1. Check the console above for the exact Redirect URI')
-        console.log('   2. Go to https://developer.spotify.com/dashboard')
-        console.log('   3. Select your app → Edit Settings')
-        console.log('   4. Verify the Redirect URI matches EXACTLY (copy-paste to be sure)')
-        console.log('   5. Make sure you clicked "Save" in the Dashboard')
-        console.log('')
-      }
-      
-      window.location.href = authUrl
+      window.location.href = getAuthorizationUrl()
     } catch (error) {
-      console.error('❌ Error generating authorization URL:', error)
-      alert(error instanceof Error ? error.message : 'Failed to generate Spotify authorization URL. Please check your configuration.')
+      alert(error instanceof Error ? error.message : 'Failed to generate Spotify authorization URL.')
     }
   }
 
+  const handleNext = async () => {
+    await spotifyPlayer.activateElement()
+    nextSong()
+  }
+
+  const handlePrevious = async () => {
+    await spotifyPlayer.activateElement()
+    previousSong()
+  }
+
   return (
-    <div className="min-h-screen p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between"
-        >
-          <div className="space-y-2">
+    <div className="min-h-full p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header Info */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b-2 border-vintage-teal/10 pb-6">
+        <div className="space-y-1">
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/concerts')}
+            className="text-vintage-teal/50 hover:text-vintage-teal p-0 h-auto font-mono text-xs tracking-wider mb-2"
+          >
+            <ArrowLeft className="mr-2 w-3 h-3" /> EJECT TAPE
+          </Button>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-vintage-teal uppercase tracking-tight">
+            {selectedConcert.artist.name}
+          </h1>
+          <div className="flex items-center gap-2 text-vintage-teal/70 font-mono text-xs md:text-sm">
+            <Calendar className="w-3 h-3" />
+            <span>{formatDate(selectedConcert.eventDate)}</span>
+            <span className="opacity-30">|</span>
+            <MapPin className="w-3 h-3" />
+            <span>{selectedConcert.venue.name}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          {!isAuthenticated && (
             <Button
-              variant="ghost"
-              onClick={() => navigate('/concerts')}
-              className="-ml-4"
+              variant="vintage"
+              size="sm"
+              onClick={handleSpotifyLogin}
+              className="font-mono tracking-wider text-xs"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Concerts
+              <LogIn className="w-3 h-3 mr-2" /> INSERT SPOTIFY KEY
             </Button>
-            <h1 className="text-4xl md:text-5xl font-display font-bold text-vintage-teal">
-              {selectedConcert.artist.name}
-            </h1>
-            <div className="flex flex-col gap-2 text-vintage-teal/70">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                <span className="text-lg">{formatDate(selectedConcert.eventDate)}</span>
+          )}
+          {spotifyPlayer.error && (
+            <div className="bg-red-50 text-red-600 text-[10px] font-mono p-1 px-2 rounded border border-red-200">
+              ERR: {spotifyPlayer.error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8 items-start">
+
+        {/* VCR DECK (Player) */}
+        <div className="lg:col-span-2 relative z-10">
+          <div className="bg-zinc-800 rounded-xl p-1 shadow-2xl ring-1 ring-white/10">
+            <div className="bg-zinc-900 rounded-lg border-t border-zinc-700 p-6 md:p-8 space-y-6 relative overflow-hidden">
+
+              {/* VCR Window */}
+              <div className="aspect-video bg-black rounded-lg border-8 border-zinc-800 relative shadow-[inset_0_0_40px_rgba(0,0,0,1)] overflow-hidden group ring-1 ring-white/5">
+                {/* Screen Reflection */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent z-20 pointer-events-none" />
+
+                {/* Content */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-90">
+                  {currentSpotifyTrack?.album?.images?.[0]?.url ? (
+                    <img
+                      src={currentSpotifyTrack.album.images[0].url}
+                      className="h-full w-full object-contain drop-shadow-2xl"
+                      alt="Album Art"
+                    />
+                  ) : (
+                    <div className="text-zinc-800 font-mono text-4xl md:text-6xl tracking-widest font-bold opacity-50">
+                      NO SIGNAL
+                    </div>
+                  )}
+                </div>
+
+                {/* Scanlines Overlay */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-20 bg-[length:100%_4px,6px_100%] pointer-events-none" />
+
+                {/* OSD */}
+                <div className="absolute top-4 left-6 font-mono text-green-500 text-lg md:text-xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] z-30 flex items-center gap-2">
+                  {isPlaying ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+                  <span>{isPlaying ? 'PLAY' : 'PAUSE'}</span>
+                </div>
+                <div className="absolute bottom-4 right-6 font-mono text-white/80 text-sm z-30 drop-shadow-md">
+                  SP 0:{String(Math.floor((currentSongIndex + 1) / 10)).padStart(1, '0')}:
+                  {String((currentSongIndex + 1) % 60).padStart(2, '0')}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-5 h-5" />
-                <span className="text-lg">
-                  {selectedConcert.venue.name}, {selectedConcert.venue.city.name}
-                  {selectedConcert.venue.city.state && `, ${selectedConcert.venue.city.state}`}
-                </span>
+
+              {/* Control Panel */}
+              <div className="bg-zinc-950 p-4 rounded border border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-6 relative">
+                {/* LED Display */}
+                <div className="flex-1 w-full bg-black border border-zinc-800 rounded p-3 px-4 font-mono text-green-500 shadow-[inset_0_0_15px_rgba(0,255,0,0.1)] relative overflow-hidden">
+                  <div className="text-[10px] text-green-500/50 uppercase mb-1">Channel {currentSongIndex + 1}</div>
+                  <div className="text-lg md:text-xl truncate leading-none tracking-tight">
+                    {currentSong?.name || 'INSERT TAPE...'}
+                  </div>
+                  <div className="absolute right-3 top-3 w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_5px_rgba(255,0,0,0.8)]"></div>
+                </div>
+
+                {/* Physical Buttons */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={handlePrevious}
+                    disabled={currentSongIndex === 0}
+                    className="h-12 w-16 bg-zinc-300 rounded-sm shadow-[0_4px_0_rgb(161,161,170),0_5px_5px_rgba(0,0,0,0.4)] active:shadow-none active:translate-y-1 transition-all border-t border-white/50 flex items-center justify-center text-zinc-800 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <SkipBack className="w-5 h-5 fill-current" />
+                  </button>
+
+                  <button
+                    onClick={handlePlayPause}
+                    className="h-12 w-20 bg-zinc-300 rounded-sm shadow-[0_4px_0_rgb(161,161,170),0_5px_5px_rgba(0,0,0,0.4)] active:shadow-none active:translate-y-1 transition-all border-t border-white/50 flex items-center justify-center text-zinc-800 hover:bg-white"
+                  >
+                    {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
+                  </button>
+
+                  <button
+                    onClick={handleNext}
+                    disabled={currentSongIndex === allSongs.length - 1}
+                    className="h-12 w-16 bg-zinc-300 rounded-sm shadow-[0_4px_0_rgb(161,161,170),0_5px_5px_rgba(0,0,0,0.4)] active:shadow-none active:translate-y-1 transition-all border-t border-white/50 flex items-center justify-center text-zinc-800 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <SkipForward className="w-5 h-5 fill-current" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Decorative Brand Badge */}
+              <div className="absolute top-2 right-4 text-[10px] font-sans font-bold text-zinc-600 tracking-widest italic opacity-50">
+                CONCERT TIME MACHINE <span className="not-italic text-red-700">HI-FI</span>
+              </div>
+
+              {/* Volume & Debug */}
+              <div className="pt-4 border-t border-zinc-800/50">
+                <div className="flex items-center gap-4 mb-4">
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider w-12">Volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    defaultValue="0.5"
+                    onChange={(e) => spotifyPlayer.setVolume(parseFloat(e.target.value))}
+                    className="flex-1 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-vintage-teal hover:accent-vintage-orange transition-colors"
+                  />
+                </div>
+
+                <details className="group">
+                  <summary className="text-[10px] font-mono text-zinc-600 cursor-pointer hover:text-zinc-400 select-none flex items-center gap-2">
+                    <span>▶</span> DEBUG INFO
+                  </summary>
+                  <div className="mt-2 p-2 bg-black/50 rounded border border-zinc-800 text-[10px] font-mono text-green-500/80 space-y-1">
+                    <div className="flex justify-between"><span>Device ID:</span> <span className="text-white/70">{spotifyPlayer.deviceId || 'None'}</span></div>
+                    <div className="flex justify-between"><span>Ready:</span> <span className="text-white/70">{spotifyPlayer.isReady ? 'Yes' : 'No'}</span></div>
+                    <div className="flex justify-between"><span>Paused:</span> <span className="text-white/70">{spotifyPlayer.isPaused ? 'Yes' : 'No'}</span></div>
+                    <div className="flex justify-between"><span>Active Track:</span> <span className="text-white/70 truncate max-w-[150px]">{currentSpotifyTrack?.name || 'None'}</span></div>
+                    <div className="flex justify-between"><span>Store Playing:</span> <span className="text-white/70">{isPlaying ? 'Yes' : 'No'}</span></div>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
 
-          {!isAuthenticated && (
-            <div className="flex flex-col items-end gap-2">
-              <Button
-                variant="vintage"
-                onClick={handleSpotifyLogin}
-                className="flex items-center gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                Connect Spotify
-              </Button>
-              {import.meta.env.DEV && (
-                <div className="text-xs text-vintage-teal/60 text-right max-w-xs space-y-1">
-                  <p>
-                    If you see a 400 error, check the browser console (F12) for detailed logs.
-                  </p>
-                  <p className="font-mono text-[10px] bg-vintage-cream/50 px-1 rounded break-all">
-                    {import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:5173/callback'}
-                  </p>
-                  <p className="text-[10px]">
-                    Make sure this EXACT URI is in Spotify Dashboard → Edit Settings → Redirect URIs
-                  </p>
-                </div>
-              )}
+          {/* Additional Concert Info Card */}
+          {selectedConcert.info && (
+            <div className="mt-6 bg-cassette-label border border-zinc-200 p-6 rounded shadow-md rotate-0 md:-rotate-1 max-w-2xl mx-auto">
+              <h3 className="font-cassette text-sm text-vintage-teal mb-2 border-b border-vintage-teal/20 pb-1">TAPE NOTES</h3>
+              <p className="font-mono text-sm text-vintage-teal/80 leading-relaxed">{selectedConcert.info}</p>
             </div>
           )}
-        </motion.div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Now Playing Card */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-2"
-          >
-            <Card className="shadow-2xl">
-              <CardHeader>
-                <CardTitle className="text-2xl">Now Playing</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-8">
-                {/* Vinyl Record Visual */}
-                <div className="flex items-center justify-center py-8">
-                  <motion.div
-                    animate={{ rotate: isPlaying ? 360 : 0 }}
-                    transition={{
-                      duration: 3,
-                      repeat: isPlaying ? Infinity : 0,
-                      ease: "linear"
-                    }}
-                    className="relative"
-                  >
-                    <div className="w-64 h-64 rounded-full bg-gradient-to-br from-vintage-teal to-vintage-orange shadow-2xl flex items-center justify-center">
-                      <div className="w-20 h-20 rounded-full bg-vintage-cream shadow-inner flex items-center justify-center overflow-hidden">
-                        {currentSpotifyTrack?.album?.images?.[0]?.url ? (
-                          <img
-                            src={currentSpotifyTrack.album.images[0].url}
-                            alt={currentSpotifyTrack.album.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <Music2 className="w-10 h-10 text-vintage-teal" />
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* Song Info */}
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentSongIndex}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="text-center space-y-4"
-                  >
-                    <h2 className="text-4xl font-display font-bold text-vintage-teal">
-                      {currentSong?.name || 'Select a song'}
-                    </h2>
-                    {currentSong?.cover && (
-                      <p className="text-lg text-vintage-teal/90 font-medium">
-                        Originally by {currentSong.cover.name}
-                      </p>
-                    )}
-                    {currentSong?.info && (
-                      <div className="flex items-start gap-2 justify-center text-vintage-teal/70">
-                        <Info className="w-4 h-4 mt-1 flex-shrink-0" />
-                        <p className="text-sm">{currentSong.info}</p>
-                      </div>
-                    )}
-                    <p className="text-vintage-teal/75 font-medium">
-                      {currentSong?.setName}
-                      {currentSong?.encore && ` • Encore ${currentSong.encore}`}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
-
-                {/* Controls */}
-                <div className="flex items-center justify-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={previousSong}
-                    disabled={currentSongIndex === 0}
-                    className="h-12 w-12"
-                  >
-                    <SkipBack className="w-6 h-6" />
-                  </Button>
-
-                  <Button
-                    variant="vintage"
-                    size="icon"
-                    onClick={handlePlayPause}
-                    className="h-16 w-16"
-                  >
-                    {isPlaying ? (
-                      <Pause className="w-8 h-8" />
-                    ) : (
-                      <Play className="w-8 h-8 ml-1" />
-                    )}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={nextSong}
-                    disabled={currentSongIndex === allSongs.length - 1}
-                    className="h-12 w-12"
-                  >
-                    <SkipForward className="w-6 h-6" />
-                  </Button>
-                </div>
-
-                {/* Progress */}
-                <div className="text-center text-sm text-vintage-teal/75 font-medium">
-                  Track {currentSongIndex + 1} of {allSongs.length}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Setlist */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="lg:col-span-1"
-          >
-            <Card className="shadow-2xl h-full max-h-[800px] overflow-hidden flex flex-col">
-              <CardHeader className="flex-shrink-0">
-                <CardTitle className="text-2xl">Setlist</CardTitle>
-              </CardHeader>
-              <CardContent className="overflow-y-auto flex-1">
-                <div className="space-y-6">
-                  {selectedConcert.sets?.set?.map((set, setIndex) => (
-                    <div key={setIndex} className="space-y-2">
-                      <h3 className="font-display font-semibold text-vintage-teal sticky top-0 bg-white/80 backdrop-blur-sm py-2 -mx-6 px-6">
-                        {set.name || `Set ${setIndex + 1}`}
-                        {set.encore && ` (Encore ${set.encore})`}
-                      </h3>
-                      <div className="space-y-1">
-                        {set.song.map((song, songIndex) => {
-                          const globalIndex = allSongs.findIndex(
-                            s => s.name === song.name && s.setName === (set.name || `Set ${setIndex + 1}`)
-                          )
-                          const isCurrentSong = globalIndex === currentSongIndex
-
-                          return (
-                            <motion.button
-                              key={songIndex}
-                              onClick={() => setCurrentSongIndex(globalIndex)}
-                              className={`w-full text-left px-4 py-2 rounded-md transition-all duration-200 ${
-                                isCurrentSong
-                                  ? 'bg-vintage-orange text-vintage-cream font-semibold shadow-md'
-                                  : 'text-vintage-teal/90 hover:bg-vintage-teal/15 hover:text-vintage-teal'
-                              }`}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs opacity-60 w-6">
-                                  {songIndex + 1}
-                                </span>
-                                <span className="flex-1">{song.name}</span>
-                                {isCurrentSong && (
-                                  <Music2 className="w-4 h-4 animate-pulse" />
-                                )}
-                              </div>
-                              {song.cover && (
-                                <div className="text-xs text-vintage-teal/70 ml-8 mt-1 font-medium">
-                                  {song.cover.name} cover
-                                </div>
-                              )}
-                            </motion.button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
         </div>
 
-        {/* Concert Info */}
-        {selectedConcert.info && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  Concert Notes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-vintage-teal/85 leading-relaxed">{selectedConcert.info}</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+        {/* TRACKLIST (Cassette Insert) */}
+        <div className="lg:col-span-1 relative">
+          <div className="bg-cassette-label rounded-sm shadow-xl border border-zinc-200 p-0 overflow-hidden sticky top-24 rotate-1 hover:rotate-0 transition-transform duration-500">
+            {/* Insert Spine styling */}
+            <div className="h-12 bg-vintage-orange flex items-center px-4 justify-between text-vintage-cream shadow-md relative z-10">
+              <span className="font-cassette text-sm tracking-widest">TRACK LISTING</span>
+              <Music2 className="w-4 h-4 opacity-80" />
+            </div>
+
+            {/* Paper Texture */}
+            <div className="absolute inset-0 opacity-5 pointer-events-none bg-noise z-0"></div>
+
+            <div className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin scrollbar-thumb-vintage-teal/20">
+              <div className="divide-y divide-vintage-teal/10">
+                {selectedConcert.sets?.set?.map((set, setIndex) => (
+                  <div key={setIndex}>
+                    <div className="bg-vintage-teal/5 px-4 py-2 font-mono text-xs font-bold text-vintage-teal/60 uppercase tracking-wider">
+                      {set.name || `SIDE ${String.fromCharCode(65 + setIndex)}`}
+                      {set.encore && ` (ENCORE)`}
+                    </div>
+
+                    <div>
+                      {set.song.map((song, songIndex) => {
+                        const startOfSetIndex = selectedConcert.sets?.set?.slice(0, setIndex).reduce((acc, s) => acc + s.song.length, 0) || 0
+                        const globalIndex = startOfSetIndex + songIndex
+                        const isCurrentSong = globalIndex === currentSongIndex
+
+                        return (
+                          <button
+                            key={songIndex}
+                            onClick={() => setCurrentSongIndex(globalIndex)}
+                            className={`w-full text-left px-4 py-3 transition-colors flex items-baseline gap-3 hover:bg-vintage-orange/5 group ${isCurrentSong ? 'bg-vintage-orange/10' : ''
+                              }`}
+                          >
+                            <span className={`font-mono text-xs w-5 flex-shrink-0 text-right pt-0.5 ${isCurrentSong ? 'text-vintage-orange font-bold' : 'text-vintage-teal/40'}`}>
+                              {songIndex + 1}
+                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              <div className={`font-display font-medium truncate text-sm ${isCurrentSong ? 'text-vintage-orange' : 'text-vintage-teal/80'}`}>
+                                {song.name}
+                              </div>
+                              {song.cover && (
+                                <div className="text-[10px] text-vintage-teal/50 italic truncate mt-0.5">
+                                  orig. {song.cover.name}
+                                </div>
+                              )}
+                            </div>
+
+                            {isCurrentSong && (
+                              <div className="w-2 h-2 rounded-full bg-vintage-orange animate-pulse flex-shrink-0 mt-1.5" />
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )

@@ -1,205 +1,181 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Calendar, MapPin, Music, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Search, Calendar, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { getArtistSetlists } from '@/api/setlistfm'
 import { useConcertStore, type Concert } from '@/stores/useConcertStore'
+import { VHSRolodex } from '@/components/VHSRolodex'
 
 export function Concerts() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+   const [isLoading, setIsLoading] = useState(true)
+   const [page] = useState(1)
+   const [searchQuery, setSearchQuery] = useState('')
+   const [searchDate, setSearchDate] = useState('')
+   const [searchLocation, setSearchLocation] = useState('')
+   const [selectedIndex, setSelectedIndex] = useState(0)
 
-  const navigate = useNavigate()
-  const { selectedArtist, concerts, setConcerts, setSelectedConcert } = useConcertStore()
+   const navigate = useNavigate()
+   const { selectedArtist, concerts, setConcerts, setSelectedConcert } = useConcertStore()
 
-  useEffect(() => {
-    if (!selectedArtist) {
-      navigate('/')
-      return
-    }
+   useEffect(() => {
+      if (!selectedArtist) {
+         navigate('/')
+         return
+      }
 
-    loadConcerts()
-  }, [selectedArtist, page])
+      loadConcerts()
+   }, [selectedArtist, page])
 
-  const loadConcerts = async () => {
-    if (!selectedArtist) return
+   const loadConcerts = async () => {
+      if (!selectedArtist) return
 
-    setIsLoading(true)
-    const { setlists, total } = await getArtistSetlists(selectedArtist.mbid, page)
-    setConcerts(setlists)
-    setTotalPages(Math.ceil(total / 20))
-    setIsLoading(false)
-  }
+      setIsLoading(true)
+      try {
+         const { setlists } = await getArtistSetlists(selectedArtist.mbid, page)
+         // Filter out concerts with no songs
+         const validConcerts = setlists.filter(concert =>
+            concert.sets?.set?.some(s => s.song?.length > 0)
+         )
+         setConcerts(validConcerts)
+      } catch (e) {
+         console.error('Error loading concerts', e)
+      } finally {
+         setIsLoading(false)
+      }
+   }
 
-  const handleSelectConcert = (concert: Concert) => {
-    setSelectedConcert(concert)
-    navigate('/player')
-  }
+   const handleSelectConcert = (concert: Concert) => {
+      setSelectedConcert(concert)
+      navigate('/player')
+   }
 
-  const formatDate = (dateString: string) => {
-    const [day, month, year] = dateString.split('-')
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+   // Filter concerts based on search criteria
+   const filteredConcerts = useMemo(() => {
+      return concerts.filter(concert => {
+         const matchesQuery = searchQuery === '' ||
+            concert.venue.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            concert.venue.city.name.toLowerCase().includes(searchQuery.toLowerCase())
 
-  if (!selectedArtist) return null
+         const matchesDate = searchDate === '' || concert.eventDate.includes(searchDate)
 
-  return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/')}
-              className="mb-4 -ml-4"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Search
-            </Button>
-            <h1 className="text-5xl font-display font-bold text-vintage-teal">
-              {selectedArtist.name}
-            </h1>
-            <p className="text-xl text-vintage-teal/85 font-medium">
-              Select a concert to relive the experience
-            </p>
-          </div>
-        </motion.div>
+         const matchesLocation = searchLocation === '' ||
+            concert.venue.city.name.toLowerCase().includes(searchLocation.toLowerCase()) ||
+            (concert.venue.city.state && concert.venue.city.state.toLowerCase().includes(searchLocation.toLowerCase())) ||
+            (concert.venue.city.country.name && concert.venue.city.country.name.toLowerCase().includes(searchLocation.toLowerCase()))
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="grid gap-6 md:grid-cols-2">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="h-6 bg-vintage-teal/10 rounded w-3/4" />
-                  <div className="h-4 bg-vintage-teal/10 rounded w-1/2 mt-2" />
-                </CardHeader>
-                <CardContent>
-                  <div className="h-4 bg-vintage-teal/10 rounded w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+         return matchesQuery && matchesDate && matchesLocation
+      })
+   }, [concerts, searchQuery, searchDate, searchLocation])
 
-        {/* Concert Grid */}
-        {!isLoading && concerts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid gap-6 md:grid-cols-2"
-          >
-            {concerts.map((concert, index) => {
-              const songCount = concert.sets?.set?.reduce(
-                (acc, set) => acc + (set.song?.length || 0),
-                0
-              ) || 0
+   // Auto-select first match when filters change
+   useEffect(() => {
+      if (filteredConcerts.length > 0) {
+         // Find the index of the first filtered concert in the original list to scroll to it
+         // OR, if we are displaying only filtered concerts, reset to 0
+         // The requirement says "UI would automatically 'flip' to that VHS concert"
+         // This implies we keep the full list but scroll to the match.
 
-              return (
-                <motion.div
-                  key={concert.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                >
-                  <Card
-                    className="cursor-pointer transition-all duration-300 h-full"
-                    onClick={() => handleSelectConcert(concert)}
+         // Let's try to find the first match in the full list that satisfies the current filters
+         // If the user is typing, we want to jump to the closest match.
+
+         const firstMatchIndex = concerts.findIndex(c => filteredConcerts.includes(c))
+         if (firstMatchIndex !== -1) {
+            setSelectedIndex(firstMatchIndex)
+         }
+      }
+   }, [filteredConcerts, concerts])
+
+   if (!selectedArtist) return null
+
+   return (
+      <div className="w-full h-full flex flex-col bg-[#fdfbf7]">
+
+         {/* Header & Filters */}
+         <div className="z-50 bg-[#fdfbf7]/90 backdrop-blur-sm border-b border-vintage-teal/10 p-4 md:p-6 shadow-sm">
+            <div className="max-w-6xl mx-auto w-full">
+               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                  <Button
+                     variant="ghost"
+                     onClick={() => navigate('/')}
+                     className="text-vintage-teal/50 hover:text-vintage-teal p-0 h-auto hover:bg-transparent font-mono text-xs tracking-wider"
                   >
-                    <CardHeader>
-                      <CardTitle className="text-2xl flex items-start gap-2">
-                        <Calendar className="w-6 h-6 text-vintage-orange flex-shrink-0 mt-1" />
-                        <span>{formatDate(concert.eventDate)}</span>
-                      </CardTitle>
-                      <CardDescription className="text-base">
-                        <div className="flex items-start gap-2 mt-2">
-                          <MapPin className="w-4 h-4 flex-shrink-0 mt-1" />
-                          <span>
-                            {concert.venue.name}
-                            <br />
-                            {concert.venue.city.name}
-                            {concert.venue.city.state && `, ${concert.venue.city.state}`}
-                            {concert.venue.city.country && `, ${concert.venue.city.country.name}`}
-                          </span>
-                        </div>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2 text-vintage-teal/80">
-                        <Music className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {songCount} {songCount === 1 ? 'song' : 'songs'}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )
-            })}
-          </motion.div>
-        )}
+                     <ArrowLeft className="mr-2 w-4 h-4" /> EJECT
+                  </Button>
 
-        {/* Empty State */}
-        {!isLoading && concerts.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
-            <Music className="w-20 h-20 text-vintage-teal/30 mx-auto mb-4" />
-            <h2 className="text-2xl font-display font-semibold text-vintage-teal mb-2">
-              No concerts found
-            </h2>
-            <p className="text-vintage-teal/80 font-medium">
-              This artist doesn't have any concerts in the database yet.
+                  <div className="text-right">
+                     <h1 className="text-2xl md:text-3xl font-display font-bold text-vintage-teal uppercase tracking-tighter leading-none">
+                        {selectedArtist.name}
+                     </h1>
+                     <div className="text-xs font-mono text-vintage-teal/60 tracking-widest">
+                        ARCHIVE_ID: {selectedArtist.mbid.slice(0, 8)}
+                     </div>
+                  </div>
+               </div>
+
+               {/* Search Controls */}
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="relative">
+                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                     <Input
+                        placeholder="Search venue..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 bg-white border-vintage-teal/20 focus:border-vintage-teal font-mono text-sm"
+                     />
+                  </div>
+                  <div className="relative">
+                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                     <Input
+                        placeholder="Date (DD-MM-YYYY)..."
+                        value={searchDate}
+                        onChange={(e) => setSearchDate(e.target.value)}
+                        className="pl-9 bg-white border-vintage-teal/20 focus:border-vintage-teal font-mono text-sm"
+                     />
+                  </div>
+                  <div className="relative">
+                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                     <Input
+                        placeholder="Location (City, State)..."
+                        value={searchLocation}
+                        onChange={(e) => setSearchLocation(e.target.value)}
+                        className="pl-9 bg-white border-vintage-teal/20 focus:border-vintage-teal font-mono text-sm"
+                     />
+                  </div>
+               </div>
+            </div>
+         </div>
+
+         {/* Main Content Area */}
+         <div className="flex-1 relative flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/subtle-paper.png')]">
+            {isLoading ? (
+               <div className="flex flex-col items-center gap-4 animate-pulse">
+                  <div className="w-64 h-40 bg-gray-200 rounded-lg"></div>
+                  <div className="font-mono text-vintage-teal/50 tracking-widest">LOADING ARCHIVES...</div>
+               </div>
+            ) : concerts.length > 0 ? (
+               <div className="w-full max-w-4xl h-full flex items-center justify-center">
+                  <VHSRolodex
+                     concerts={concerts}
+                     onSelect={handleSelectConcert}
+                     selectedIndex={selectedIndex}
+                  />
+               </div>
+            ) : (
+               <div className="text-center opacity-60">
+                  <p className="font-mono text-vintage-teal tracking-widest">NO TAPES FOUND</p>
+               </div>
+            )}
+         </div>
+
+         {/* Footer Info */}
+         <div className="bg-[#fdfbf7] border-t border-vintage-teal/10 p-2 text-center">
+            <p className="font-mono text-[10px] text-vintage-teal/40 uppercase tracking-[0.2em]">
+               {filteredConcerts.length} MATCHES FOUND // SCROLL TO BROWSE
             </p>
-          </motion.div>
-        )}
+         </div>
 
-        {/* Pagination */}
-        {!isLoading && totalPages > 1 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center justify-center gap-4 pt-8"
-          >
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="w-5 h-5 mr-2" />
-              Previous
-            </Button>
-            <span className="text-vintage-teal font-medium">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              Next
-              <ChevronRight className="w-5 h-5 ml-2" />
-            </Button>
-          </motion.div>
-        )}
       </div>
-    </div>
-  )
+   )
 }
+

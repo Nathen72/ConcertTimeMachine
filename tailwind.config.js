@@ -46,9 +46,17 @@ export default {
           cream: '#F5E6D3',
           orange: '#FF6B35',
           teal: '#004E64',
-          yellow: '#64748B', // Changed to slate blue-gray
+          yellow: '#64748B',
           brown: '#8B4513',
           sage: '#9CAF88',
+          bg: '#1a1a1a', // Dark background for the whole app
+        },
+        cassette: {
+          body: '#e8e4da', // Light plastic shell
+          border: '#8c8c8c', // Plastic gray border
+          dark: '#2d2d2d', // Dark components
+          label: '#fdfbf7', // Paper label
+          window: '#1a1a1a', // Tape window
         }
       },
       borderRadius: {
