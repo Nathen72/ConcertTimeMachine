@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Search, Calendar, MapPin } from 'lucide-react'
+import { ArrowLeft, Search, Calendar, MapPin, LayoutGrid, GalleryHorizontalEnd } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getArtistSetlists } from '@/api/setlistfm'
 import { useConcertStore, type Concert } from '@/stores/useConcertStore'
 import { VHSRolodex } from '@/components/VHSRolodex'
+import { CassetteDesktop } from '@/components/CassetteDesktop'
 
 export function Concerts() {
    const [isLoading, setIsLoading] = useState(true)
@@ -14,6 +15,7 @@ export function Concerts() {
    const [searchDate, setSearchDate] = useState('')
    const [searchLocation, setSearchLocation] = useState('')
    const [selectedIndex, setSelectedIndex] = useState(0)
+   const [viewMode, setViewMode] = useState<'rolodex' | 'desktop'>('rolodex')
 
    const navigate = useNavigate()
    const { selectedArtist, concerts, setConcerts, setSelectedConcert } = useConcertStore()
@@ -95,13 +97,35 @@ export function Concerts() {
          <div className="z-50 bg-[#fdfbf7]/90 backdrop-blur-sm border-b border-vintage-teal/10 p-4 md:p-6 shadow-sm">
             <div className="max-w-6xl mx-auto w-full">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                  <Button
-                     variant="ghost"
-                     onClick={() => navigate('/')}
-                     className="text-vintage-teal/50 hover:text-vintage-teal p-0 h-auto hover:bg-transparent font-mono text-xs tracking-wider"
-                  >
-                     <ArrowLeft className="mr-2 w-4 h-4" /> EJECT
-                  </Button>
+                  <div className="flex items-center gap-4">
+                     <Button
+                        variant="ghost"
+                        onClick={() => navigate('/')}
+                        className="text-vintage-teal/50 hover:text-vintage-teal p-0 h-auto hover:bg-transparent font-mono text-xs tracking-wider"
+                     >
+                        <ArrowLeft className="mr-2 w-4 h-4" /> EJECT
+                     </Button>
+
+                     {/* View Mode Toggle */}
+                     <div className="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
+                        <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => setViewMode('rolodex')}
+                           className={`h-7 px-2 text-xs font-mono ${viewMode === 'rolodex' ? 'bg-white shadow-sm text-vintage-teal' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                           <GalleryHorizontalEnd className="w-3 h-3 mr-1" /> ROLODEX
+                        </Button>
+                        <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => setViewMode('desktop')}
+                           className={`h-7 px-2 text-xs font-mono ${viewMode === 'desktop' ? 'bg-white shadow-sm text-vintage-teal' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                           <LayoutGrid className="w-3 h-3 mr-1" /> DESKTOP
+                        </Button>
+                     </div>
+                  </div>
 
                   <div className="text-right">
                      <h1 className="text-2xl md:text-3xl font-display font-bold text-vintage-teal uppercase tracking-tighter leading-none">
@@ -147,20 +171,27 @@ export function Concerts() {
          </div>
 
          {/* Main Content Area */}
-         <div className="flex-1 relative flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/subtle-paper.png')]">
+         <div className="flex-1 relative flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/subtle-paper.png')] overflow-hidden">
             {isLoading ? (
                <div className="flex flex-col items-center gap-4 animate-pulse">
                   <div className="w-64 h-40 bg-gray-200 rounded-lg"></div>
                   <div className="font-mono text-vintage-teal/50 tracking-widest">LOADING ARCHIVES...</div>
                </div>
             ) : concerts.length > 0 ? (
-               <div className="w-full max-w-4xl h-full flex items-center justify-center">
-                  <VHSRolodex
-                     concerts={concerts}
-                     onSelect={handleSelectConcert}
-                     selectedIndex={selectedIndex}
+               viewMode === 'rolodex' ? (
+                  <div className="w-full max-w-4xl h-full flex items-center justify-center">
+                     <VHSRolodex
+                        concerts={concerts}
+                        onSelect={handleSelectConcert}
+                        selectedIndex={selectedIndex}
+                     />
+                  </div>
+               ) : (
+                  <CassetteDesktop
+                     concerts={filteredConcerts.length > 0 ? filteredConcerts : concerts}
+                     onPlay={handleSelectConcert}
                   />
-               </div>
+               )
             ) : (
                <div className="text-center opacity-60">
                   <p className="font-mono text-vintage-teal tracking-widest">NO TAPES FOUND</p>
@@ -169,9 +200,9 @@ export function Concerts() {
          </div>
 
          {/* Footer Info */}
-         <div className="bg-[#fdfbf7] border-t border-vintage-teal/10 p-2 text-center">
+         <div className="bg-[#fdfbf7] border-t border-vintage-teal/10 p-2 text-center relative z-20">
             <p className="font-mono text-[10px] text-vintage-teal/40 uppercase tracking-[0.2em]">
-               {filteredConcerts.length} MATCHES FOUND // SCROLL TO BROWSE
+               {filteredConcerts.length} MATCHES FOUND // {viewMode === 'rolodex' ? 'SCROLL TO BROWSE' : 'DRAG TAPE TO PLAY'}
             </p>
          </div>
 
